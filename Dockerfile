@@ -32,6 +32,11 @@ COPY deploy-container/container-installs.sh /usr/bin/deploy-container-installs.s
 RUN sudo chmod +x /usr/bin/deploy-container-entrypoint.sh
 RUN sudo chmod +x /usr/bin/deploy-container-installs.sh
 
+# Make sure /usr/local/bin is properly set up
+RUN sudo mkdir -p /usr/local/bin
+RUN sudo chmod 755 /usr/local/bin
+RUN echo 'export PATH="/usr/local/bin:$PATH"' | sudo tee -a /etc/profile
+
 # Ensure proper ownership of files
 RUN sudo chown -R coder:coder /home/coder
 

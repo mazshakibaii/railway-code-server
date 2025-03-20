@@ -56,17 +56,29 @@ install_applications() {
                     # Install as coder user
                     sudo -u coder curl -fsSL https://bun.sh/install | sudo -u coder bash
                     
+                    # Create symlinks to make bun available system-wide
+                    if [ -d "/home/coder/.bun/bin" ]; then
+                        sudo ln -sf /home/coder/.bun/bin/bun /usr/local/bin/bun
+                        sudo ln -sf /home/coder/.bun/bin/bunx /usr/local/bin/bunx
+                    fi
+                    
                     # Add bun to system-wide path
                     echo 'export BUN_INSTALL="/home/coder/.bun"' >> /home/coder/.bashrc
                     echo 'export PATH="/home/coder/.bun/bin:$PATH"' >> /home/coder/.bashrc
                     
                     # Also add to the global profile
-                    echo 'export BUN_INSTALL="/home/coder/.bun"' | sudo tee -a /etc/profile.d/bun.sh
+                    echo 'export BUN_INSTALL="/home/coder/.bun"' | sudo tee /etc/profile.d/bun.sh
                     echo 'export PATH="/home/coder/.bun/bin:$PATH"' | sudo tee -a /etc/profile.d/bun.sh
                     sudo chmod +x /etc/profile.d/bun.sh
                 else
                     # Already the coder user
                     curl -fsSL https://bun.sh/install | bash
+                    
+                    # Create symlinks to make bun available system-wide
+                    if [ -d "$HOME/.bun/bin" ]; then
+                        sudo ln -sf $HOME/.bun/bin/bun /usr/local/bin/bun
+                        sudo ln -sf $HOME/.bun/bin/bunx /usr/local/bin/bunx
+                    fi
                     
                     # Add bun to your path
                     echo 'export BUN_INSTALL="$HOME/.bun"' >> $HOME/.bashrc
@@ -83,13 +95,28 @@ install_applications() {
                     # Install as coder user
                     sudo -u coder curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sudo -u coder sh -s -- -y
                     
+                    # Create symlinks to make cargo available system-wide
+                    if [ -d "/home/coder/.cargo/bin" ]; then
+                        sudo ln -sf /home/coder/.cargo/bin/cargo /usr/local/bin/cargo
+                        sudo ln -sf /home/coder/.cargo/bin/rustc /usr/local/bin/rustc
+                        sudo ln -sf /home/coder/.cargo/bin/rustup /usr/local/bin/rustup
+                    fi
+                    
                     # Add cargo to system paths
                     echo 'export PATH="/home/coder/.cargo/bin:$PATH"' >> /home/coder/.bashrc
-                    echo 'export PATH="/home/coder/.cargo/bin:$PATH"' | sudo tee -a /etc/profile.d/rust.sh
+                    echo 'export PATH="/home/coder/.cargo/bin:$PATH"' | sudo tee /etc/profile.d/rust.sh
                     sudo chmod +x /etc/profile.d/rust.sh
                 else
                     # Already the coder user
                     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                    
+                    # Create symlinks to make cargo available system-wide
+                    if [ -d "$HOME/.cargo/bin" ]; then
+                        sudo ln -sf $HOME/.cargo/bin/cargo /usr/local/bin/cargo
+                        sudo ln -sf $HOME/.cargo/bin/rustc /usr/local/bin/rustc
+                        sudo ln -sf $HOME/.cargo/bin/rustup /usr/local/bin/rustup
+                    fi
+                    
                     # Add cargo to PATH for this session
                     echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> $HOME/.bashrc
                 fi
@@ -230,12 +257,41 @@ install_applications
 # Create a file for custom environment variables
 cat << 'EOF' | sudo tee /etc/profile.d/custom-env.sh
 # Custom environment setup
+export PATH="/usr/local/bin:$PATH"
 export PATH="$PATH:/home/coder/.bun/bin"  # For bun
 export PATH="$PATH:/home/coder/.cargo/bin"  # For rust
 # Add other paths as needed
 EOF
 
 sudo chmod +x /etc/profile.d/custom-env.sh
+
+# Create symlinks script to ensure binaries are always available
+cat << 'EOF' | sudo tee /usr/local/bin/update-dev-symlinks
+#!/bin/bash
+# Create symlinks for developer tools if they exist but aren't linked
+
+# Bun
+if [ -f "/home/coder/.bun/bin/bun" ] && [ ! -f "/usr/local/bin/bun" ]; then
+  sudo ln -sf /home/coder/.bun/bin/bun /usr/local/bin/bun
+  sudo ln -sf /home/coder/.bun/bin/bunx /usr/local/bin/bunx
+fi
+
+# Rust
+if [ -f "/home/coder/.cargo/bin/cargo" ] && [ ! -f "/usr/local/bin/cargo" ]; then
+  sudo ln -sf /home/coder/.cargo/bin/cargo /usr/local/bin/cargo
+  sudo ln -sf /home/coder/.cargo/bin/rustc /usr/local/bin/rustc
+  sudo ln -sf /home/coder/.cargo/bin/rustup /usr/local/bin/rustup
+fi
+EOF
+
+sudo chmod +x /usr/local/bin/update-dev-symlinks
+
+# Add the symlink update script to bashrc to run on login
+echo '. /etc/profile.d/custom-env.sh' >> /home/coder/.bashrc
+echo '/usr/local/bin/update-dev-symlinks' >> /home/coder/.bashrc
+
+# Run the symlink update script now
+sudo /usr/local/bin/update-dev-symlinks
 
 # Ensure proper ownership of all files in coder's home directory
 if [ -n "$SUDO_USER" ]; then

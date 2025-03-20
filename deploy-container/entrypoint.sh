@@ -15,6 +15,16 @@ if [ -f /etc/profile.d/custom-env.sh ]; then
     . /etc/profile.d/custom-env.sh
 fi
 
+# Make sure symlinks for developer tools exist
+if [ -f "/usr/local/bin/update-dev-symlinks" ]; then
+    sudo /usr/local/bin/update-dev-symlinks
+fi
+
+# Directly modify PATH to include common binary locations
+export PATH="/usr/local/bin:$PATH"
+export PATH="/home/coder/.bun/bin:$PATH"
+export PATH="/home/coder/.cargo/bin:$PATH"
+
 START_DIR="${START_DIR:-/home/coder/project}"
 
 PREFIX="deploy-code-server"
@@ -115,6 +125,22 @@ fi
 echo "[$PREFIX] Environment PATH: $PATH"
 echo "[$PREFIX] User: $(whoami)"
 echo "[$PREFIX] Home: $HOME"
+
+# Check if bun is available directly
+if command -v bun >/dev/null 2>&1; then
+    echo "[$PREFIX] Bun is available at: $(which bun)"
+    bun --version
+else
+    echo "[$PREFIX] Bun command not found in PATH"
+    
+    # Try to find bun in common locations
+    if [ -f "/home/coder/.bun/bin/bun" ]; then
+        echo "[$PREFIX] Found bun at /home/coder/.bun/bin/bun"
+        sudo ln -sf /home/coder/.bun/bin/bun /usr/local/bin/bun
+        sudo ln -sf /home/coder/.bun/bin/bunx /usr/local/bin/bunx
+        echo "[$PREFIX] Created symlinks in /usr/local/bin"
+    fi
+fi
 
 echo "[$PREFIX] Starting code-server..."
 # Now we can run code-server with the default entrypoint
