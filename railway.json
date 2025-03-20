@@ -1,0 +1,7 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "deploy": {
+    "sleepApplication": true,
+    "region": "europe-west4"
+  }
+}
