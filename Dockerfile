@@ -16,13 +16,14 @@ RUN curl https://rclone.org/install.sh | sudo bash
 # Copy rclone tasks to /tmp, to potentially be used
 COPY deploy-container/rclone-tasks.json /tmp/rclone-tasks.json
 
-# Create loading page directory
+# Create loading page directory and copy files
 RUN mkdir -p /home/coder/loading
-
-# Copy loading page files
 COPY deploy-container/loading.html /home/coder/loading/index.html
 COPY deploy-container/server.py /home/coder/loading/server.py
-RUN chmod +x /home/coder/loading/server.py
+
+# Fix permissions
+RUN sudo chown -R coder:coder /home/coder && \
+    chmod +x /home/coder/loading/server.py
 
 # Fix permissions for code-server
 RUN sudo chown -R coder:coder /home/coder/.local
@@ -37,8 +38,5 @@ COPY deploy-container/entrypoint.sh /usr/bin/deploy-container-entrypoint.sh
 
 # Make the scripts executable
 RUN sudo chmod +x /usr/bin/deploy-container-entrypoint.sh
-
-# Ensure proper ownership of files
-RUN sudo chown -R coder:coder /home/coder
 
 ENTRYPOINT ["/usr/bin/deploy-container-entrypoint.sh"]
