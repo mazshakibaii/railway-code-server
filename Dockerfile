@@ -26,10 +26,14 @@ EXPOSE 8080
 
 # Use our custom entrypoint script first
 COPY deploy-container/entrypoint.sh /usr/bin/deploy-container-entrypoint.sh
+COPY deploy-container/container-installs.sh /usr/bin/deploy-container-installs.sh
 
-# Make the entrypoint script executable
+# Make the scripts executable
 RUN sudo chmod +x /usr/bin/deploy-container-entrypoint.sh
+RUN sudo chmod +x /usr/bin/deploy-container-installs.sh
+
 # Ensure proper ownership of files
 RUN sudo chown -R coder:coder /home/coder
 
-CMD ["/usr/bin/deploy-container-entrypoint.sh"]
+RUN ["/usr/bin/deploy-container-installs.sh"]
+ENTRYPOINT ["/usr/bin/deploy-container-entrypoint.sh"]
