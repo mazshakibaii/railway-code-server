@@ -35,5 +35,5 @@ RUN sudo chmod +x /usr/bin/deploy-container-installs.sh
 # Ensure proper ownership of files
 RUN sudo chown -R coder:coder /home/coder
 
-RUN ["/usr/bin/deploy-container-installs.sh"]
+CMD ["/usr/bin/deploy-container-installs.sh"]
 ENTRYPOINT ["/usr/bin/deploy-container-entrypoint.sh"]
