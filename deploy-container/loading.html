@@ -50,6 +50,7 @@
         overflow-y: auto;
         font-family: monospace;
         font-size: 14px;
+        white-space: pre-line;
       }
       .refresh {
         margin-top: 20px;
@@ -74,8 +75,63 @@
       Refresh Status
     </button>
     <script>
-      // Auto-refresh the page every 10 seconds
-      setTimeout(function () {
+      // Function to scroll log to bottom
+      function scrollToBottom() {
+        const logElement = document.getElementById("log")
+        logElement.scrollTop = logElement.scrollHeight
+      }
+
+      // Function to check if code-server is ready by looking for its login page or UI
+      function checkCodeServerReady() {
+        fetch("/", {
+          method: "HEAD",
+          cache: "no-store",
+        })
+          .then((response) => {
+            // Check if response might be from code-server rather than loading server
+            // The loading server only serves specific paths, so any success on "/"
+            // means code-server is likely running
+            if (response.ok && response.status === 200) {
+              console.log("Code server may be ready, checking content type...")
+              return response.headers.get("content-type")
+            }
+            return null
+          })
+          .then((contentType) => {
+            if (contentType && contentType.includes("text/html")) {
+              // Find out if it's from our loading page or from code-server
+              return fetch("/loading-status.txt", { cache: "no-store" })
+                .then((statusResponse) => {
+                  if (statusResponse.status === 404) {
+                    // If loading-status.txt is not found, code-server is running
+                    console.log("Code-server is ready, redirecting...")
+                    window.location.href = "/"
+                    return true
+                  }
+                  return false
+                })
+                .catch(() => {
+                  // If we can't fetch loading-status.txt, code-server might be running
+                  console.log(
+                    "Cannot fetch status, code-server might be ready, redirecting..."
+                  )
+                  window.location.href = "/"
+                  return true
+                })
+            }
+            return false
+          })
+          .catch((error) => {
+            console.log("Error checking code-server status:", error)
+            return false
+          })
+      }
+
+      // Check for code-server every 3 seconds
+      const readyCheckInterval = setInterval(checkCodeServerReady, 3000)
+
+      // Auto-refresh the loading page every 10 seconds if code-server isn't ready yet
+      const refreshTimeout = setTimeout(function () {
         window.location.reload()
       }, 10000)
 
@@ -84,11 +140,24 @@
         .then((response) => response.text())
         .then((data) => {
           document.getElementById("log").innerText = data
+          // Scroll to bottom after updating content
+          scrollToBottom()
+
+          // If logs contain a message about starting code-server, check more frequently
+          if (data.includes("Starting code-server")) {
+            console.log("Code-server is starting, checking more frequently...")
+            // Clear existing interval and check more frequently
+            clearInterval(readyCheckInterval)
+            setInterval(checkCodeServerReady, 1000)
+          }
         })
         .catch((err) => {
           document.getElementById("log").innerText =
             "Error loading status. Please try refreshing."
         })
+
+      // Also scroll to bottom on initial load
+      window.onload = scrollToBottom
     </script>
   </body>
 </html>
