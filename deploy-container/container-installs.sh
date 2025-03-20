@@ -4,6 +4,14 @@ START_DIR="${START_DIR:-/home/coder/project}"
 
 PREFIX="deploy-code-server"
 
+# Ensure we're running as the coder user or sudo to the coder user
+if [ "$(whoami)" != "coder" ]; then
+    echo "[$PREFIX] Running as $(whoami), will sudo operations as coder where needed"
+    SUDO_USER="coder"
+else
+    SUDO_USER=""
+fi
+
 # Set default APP_NAME if not provided
 APP_NAME="${APP_NAME:-Code Server}"
 
@@ -44,10 +52,26 @@ install_applications() {
                 ;;
             "bun")
                 echo "[$PREFIX] Installing Bun..."
-                curl -fsSL https://bun.sh/install | bash
-                # Add bun to PATH for this session
-                export BUN_INSTALL="$HOME/.bun"
-                export PATH="$BUN_INSTALL/bin:$PATH"
+                if [ -n "$SUDO_USER" ]; then
+                    # Install as coder user
+                    sudo -u coder curl -fsSL https://bun.sh/install | sudo -u coder bash
+                    
+                    # Add bun to system-wide path
+                    echo 'export BUN_INSTALL="/home/coder/.bun"' >> /home/coder/.bashrc
+                    echo 'export PATH="/home/coder/.bun/bin:$PATH"' >> /home/coder/.bashrc
+                    
+                    # Also add to the global profile
+                    echo 'export BUN_INSTALL="/home/coder/.bun"' | sudo tee -a /etc/profile.d/bun.sh
+                    echo 'export PATH="/home/coder/.bun/bin:$PATH"' | sudo tee -a /etc/profile.d/bun.sh
+                    sudo chmod +x /etc/profile.d/bun.sh
+                else
+                    # Already the coder user
+                    curl -fsSL https://bun.sh/install | bash
+                    
+                    # Add bun to your path
+                    echo 'export BUN_INSTALL="$HOME/.bun"' >> $HOME/.bashrc
+                    echo 'export PATH="$BUN_INSTALL/bin:$PATH"' >> $HOME/.bashrc
+                fi
                 ;;
             "go")
                 echo "[$PREFIX] Installing Go..."
@@ -55,9 +79,20 @@ install_applications() {
                 ;;
             "rust")
                 echo "[$PREFIX] Installing Rust..."
-                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-                # Add cargo to PATH for this session
-                source "$HOME/.cargo/env"
+                if [ -n "$SUDO_USER" ]; then
+                    # Install as coder user
+                    sudo -u coder curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sudo -u coder sh -s -- -y
+                    
+                    # Add cargo to system paths
+                    echo 'export PATH="/home/coder/.cargo/bin:$PATH"' >> /home/coder/.bashrc
+                    echo 'export PATH="/home/coder/.cargo/bin:$PATH"' | sudo tee -a /etc/profile.d/rust.sh
+                    sudo chmod +x /etc/profile.d/rust.sh
+                else
+                    # Already the coder user
+                    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                    # Add cargo to PATH for this session
+                    echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> $HOME/.bashrc
+                fi
                 ;;
             "java")
                 echo "[$PREFIX] Installing Java..."
@@ -191,3 +226,18 @@ fi
 
 # Install requested applications/runtimes
 install_applications
+
+# Create a file for custom environment variables
+cat << 'EOF' | sudo tee /etc/profile.d/custom-env.sh
+# Custom environment setup
+export PATH="$PATH:/home/coder/.bun/bin"  # For bun
+export PATH="$PATH:/home/coder/.cargo/bin"  # For rust
+# Add other paths as needed
+EOF
+
+sudo chmod +x /etc/profile.d/custom-env.sh
+
+# Ensure proper ownership of all files in coder's home directory
+if [ -n "$SUDO_USER" ]; then
+    sudo chown -R coder:coder /home/coder
+fi
