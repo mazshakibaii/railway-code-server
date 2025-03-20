@@ -178,6 +178,9 @@ if [ -n "$VS_CODE_EXTENSIONS" ]; then
     echo "[$PREFIX] Installing additional VS Code extensions..."
     IFS=',' read -ra EXTENSIONS <<< "$VS_CODE_EXTENSIONS"
     for extension in "${EXTENSIONS[@]}"; do
+        # Trim whitespace
+        extension=$(echo "$extension" | tr -d '[:space:]')
+        
         # Skip if extension is empty (can happen with trailing commas)
         if [ -n "$extension" ]; then
             echo "[$PREFIX] Installing extension: $extension"
