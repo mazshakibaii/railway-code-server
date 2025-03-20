@@ -4,11 +4,88 @@ START_DIR="${START_DIR:-/home/coder/project}"
 
 PREFIX="deploy-code-server"
 
+# Set default APP_NAME if not provided
+APP_NAME="${APP_NAME:-Code Server}"
+
 mkdir -p $START_DIR
 
 # function to clone the git repo or add a user's first file if no repo was specified.
 project_init () {
     [ -z "${GIT_REPO}" ] && echo "[$PREFIX] No GIT_REPO specified" && echo "Example file. Have questions? Join us at https://community.coder.com" > $START_DIR/coder.txt || git clone $GIT_REPO $START_DIR
+}
+
+# Function to install applications/runtimes
+install_applications() {
+    if [ -z "${INSTALL_APPS}" ]; then
+        echo "[$PREFIX] No applications specified to install"
+        return
+    fi
+
+    echo "[$PREFIX] Installing requested applications..."
+    
+    # Update package lists
+    sudo apt-get update
+    
+    # Parse comma-separated list
+    IFS=',' read -ra APPS <<< "$INSTALL_APPS"
+    for app in "${APPS[@]}"; do
+        # Trim whitespace
+        app=$(echo "$app" | tr -d '[:space:]')
+        
+        if [ -z "$app" ]; then
+            continue  # Skip empty entries
+        fi
+        
+        echo "[$PREFIX] Installing $app..."
+        case "$app" in
+            "node")
+                echo "[$PREFIX] Installing Node.js..."
+                sudo apt-get install -y nodejs npm
+                ;;
+            "bun")
+                echo "[$PREFIX] Installing Bun..."
+                curl -fsSL https://bun.sh/install | bash
+                # Add bun to PATH for this session
+                export BUN_INSTALL="$HOME/.bun"
+                export PATH="$BUN_INSTALL/bin:$PATH"
+                ;;
+            "go")
+                echo "[$PREFIX] Installing Go..."
+                sudo apt-get install -y golang-go
+                ;;
+            "rust")
+                echo "[$PREFIX] Installing Rust..."
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                # Add cargo to PATH for this session
+                source "$HOME/.cargo/env"
+                ;;
+            "java")
+                echo "[$PREFIX] Installing Java..."
+                sudo apt-get install -y default-jdk
+                ;;
+            "python")
+                echo "[$PREFIX] Installing Python..."
+                sudo apt-get install -y python3 python3-pip python3-venv
+                ;;
+            "zig")
+                echo "[$PREFIX] Installing Zig..."
+                # Get latest release URL
+                ZIG_URL=$(curl -s https://ziglang.org/download/ | grep -o 'https://ziglang.org/download/[0-9.]*[0-9]/zig-linux-x86_64-[0-9.]*[0-9].tar.xz' | head -1)
+                if [ -n "$ZIG_URL" ]; then
+                    wget -O /tmp/zig.tar.xz "$ZIG_URL"
+                    sudo mkdir -p /usr/local/zig
+                    sudo tar -xf /tmp/zig.tar.xz -C /usr/local/zig --strip-components=1
+                    sudo ln -sf /usr/local/zig/zig /usr/local/bin/
+                    rm /tmp/zig.tar.xz
+                else
+                    echo "[$PREFIX] Failed to find Zig download URL"
+                fi
+                ;;
+            *)
+                echo "[$PREFIX] Unknown application: $app"
+                ;;
+        esac
+    done
 }
 
 # add rclone config and start rclone, if supplied
@@ -108,6 +185,9 @@ if [ -n "$VS_CODE_EXTENSIONS" ]; then
         fi
     done
 fi
+
+# Install requested applications/runtimes
+install_applications
 
 echo "[$PREFIX] Starting code-server..."
 # Now we can run code-server with the default entrypoint

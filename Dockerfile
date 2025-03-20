@@ -19,23 +19,6 @@ COPY deploy-container/rclone-tasks.json /tmp/rclone-tasks.json
 # Fix permissions for code-server
 RUN sudo chown -R coder:coder /home/coder/.local
 
-# You can add custom software and dependencies for your environment below
-# -----------
-
-# # Install a VS Code extension:
-# # Note: we use a different marketplace than VS Code. See https://github.com/cdr/code-server/blob/main/docs/FAQ.md#differences-compared-to-vs-code
-# RUN code-server --install-extension esbenp.prettier-vscode 
-# RUN code-server --install-extension rooveterinaryinc.roo-cline
-# RUN code-server --install-extension bradlc.vscode-tailwindcss
-
-# # Install apt packages:
-# RUN sudo apt-get install -y nodejs
-
-# RUN curl -fsSL https://bun.sh/install | bash
-
-# # Use the full path to bun executable instead of relying on PATH
-# RUN /home/coder/.bun/bin/bun install -g git-cz commitizen
-
 # Port
 ENV PORT=8080
 # Ensure the port is exposed
