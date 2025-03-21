@@ -67,7 +67,6 @@ install_applications() {
             continue  # Skip empty entries
         fi
         
-        update_status "Installing $app..."
         case "$app" in
             "node")
                 update_status "Installing Node.js..."

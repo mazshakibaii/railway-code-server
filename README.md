@@ -1,53 +1,156 @@
-# Railway Code Server
+# VS Code Server for Railway
 
-A customized version of code-server designed for Railway deployments with a WebSocket-based loading page.
+A customized code-server deployment template for [Railway](https://railway.app), featuring a rapid build time with an extensible and programmable set of parameters to fine-tune your environment exactly how you want it (e.g. specify applications, runtimes, vscode extensions).
 
 ## Features
 
-- Fast startup with a loading page during initialization
-- Real-time status updates using WebSockets
-- Automatic redirection to code-server when ready
-- Support for custom Git repositories
-- Support for dotfiles
+- **VS Code Anywhere**: Spin up a remote code environment and access from anywhere
+- **Application Installation**: Easily install common development tools
+- **VS Code Extension Support**: Pre-install your favorite extensions
+- **Git Repository Integration**: Clone your project automatically on startup
 
-## Building the Status Server Binary
+## Quick Start
 
-Before building the Docker image, you need to compile the Go status server binary:
+1. Click the button below to deploy to Railway:
+
+   [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/gsXgfZ?referralCode=tvRhO8)
+
+2. Configure your deployment with environment variables (see below)
+3. Wait for the build to complete
+4. Access your code-server from the URL provided by Railway
+
+## Configuration
+
+Configure your environment using the following variables:
+
+| Variable             | Description                                                                        | Example                                            |
+| -------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `PASSWORD`           | Password for accessing code-server                                                 | `your-secure-password`                             |
+| `GIT_REPO`           | Repository to clone on startup                                                     | `https://github.com/username/repo.git`             |
+| `INSTALL_APPS`       | Comma-separated list of apps to install                                            | `node,bun,python,go,rust,java,zig`                 |
+| `VS_CODE_EXTENSIONS` | Comma-separated list of extension IDs ([OpenVSX](https://open-vsx.org/) supported) | `esbenp.prettier-vscode,bradlc.vscode-tailwindcss` |
+| `DOTFILES_REPO`      | Repository with dotfiles to use                                                    | `https://github.com/username/dotfiles.git`         |
+| `DOTFILES_SYMLINK`   | Whether to symlink dotfiles (true/false)                                           | `true`                                             |
+| `START_DIR`          | Starting directory for code-server                                                 | `/home/coder/project`                              |
+| `APP_NAME`           | Custom name for the code-server instance                                           | `My Project IDE`                                   |
+
+## Application Support
+
+You can install the following applications using the `INSTALL_APPS` variable:
+
+- `node` - Node.js and NPM
+- `bun` - Bun JavaScript runtime
+- `go` - Go programming language
+- `rust` - Rust programming language
+- `java` - Java Development Kit
+- `python` - Python 3 with pip and venv
+- `zig` - Zig programming language
+
+## Development Guide
+
+### Prerequisites
+
+- Docker
+- Go (for working on the status server)
+- Make
+
+### Using the Makefile
+
+This project includes a comprehensive Makefile that simplifies development and building tasks. Here are the main commands:
+
+#### Go Server Development
 
 ```bash
-# Navigate to the server directory
-cd deploy-container/server
+# Set up Go modules and dependencies
+make deps
 
-# Initialize the Go module (if not already done)
-go mod init status-server
+# Build the Go status server for your current platform
+make build
+
+# Build the Go status server specifically for Linux
+make linux
+
+# Clean build artifacts
+make clean
+```
+
+#### Docker Image Building
+
+```bash
+# Build and tag the Docker image
+make docker
+
+# Build the Docker image with a custom tag
+make docker TAG=my-custom-tag
+
+# Run the Docker container locally
+make run
+
+# Run with custom environment variables
+make run PASSWORD=mysecret GIT_REPO=https://github.com/myuser/myrepo.git
+```
+
+#### Complete Rebuild
+
+```bash
+# Rebuild everything (Go binary and Docker image)
+make all
+```
+
+### Manual Building (Without Make)
+
+If you prefer not to use Make, you can manually build:
+
+```bash
+# Build the Go status server
+cd deploy-container/server
+go mod init status-server # If not already initialized
 go get github.com/gorilla/websocket
 go mod tidy
-
-# Build the binary
 go build -o bin/status-server main.go
-```
 
-This will create a binary in `deploy-container/server/bin/` that will be copied into the Docker image.
-
-## Building the Docker Image
-
-```bash
+# Build the Docker image
 docker build -t code-server-railway .
-```
 
-## Running the Container
-
-```bash
+# Run the container
 docker run -p 8080:8080 -e PASSWORD=your_password code-server-railway
 ```
 
-## Environment Variables
+## How It Works
 
-- `PASSWORD`: The password for the code-server instance
-- `GIT_REPO`: The Git repository to clone on startup
-- `DOTFILES_REPO`: A repository of dotfiles to apply
-- `INSTALL_APPS`: Comma-separated list of applications to install (e.g., "node,python,go,rust")
-- `VS_CODE_EXTENSIONS`: Comma-separated list of VS Code extensions to install
+This project enhances the standard code-server Docker image with:
+
+1. A Go-based WebSocket server that provides real-time status updates
+2. A custom loading page that displays initialization progress
+3. A customized entrypoint script that handles:
+   - Repository cloning
+   - Application installation
+   - VS Code extension installation
+   - Dotfiles setup
+   - Seamless transition to code-server
+
+## Customizing the Code Server
+
+### Modifying the Docker Image
+
+To update your code-server version, modify the version number in your Dockerfile. See the [list of tags](https://hub.docker.com/r/codercom/code-server/tags?page=1&ordering=last_updated) for the latest version.
+
+You can add additional dependencies in the Dockerfile:
+
+```Dockerfile
+# Install a VS Code extension
+RUN code-server --install-extension esbenp.prettier-vscode
+
+# Install apt packages
+RUN sudo apt-get install -y your-package-name
+
+# Copy custom files
+COPY your-file /home/coder/your-file
+```
+
+## Contributing
+
+Contributions are welcome! Feel free to open issues or submit pull requests.
 
 ## Railway Deployment
 
@@ -55,118 +158,10 @@ This repository is designed to be deployed on Railway. Simply connect your repos
 
 **Important**: Make sure to precompile the Go status server binary before pushing changes. The binary is shipped with the repository to speed up the deployment process.
 
-## Guides
+## License
 
-- [Deploy on Railway](../guides/railway.md)
-- [Deploy on Heroku](../guides/heroku.md)
+[MIT License](LICENSE)
 
-Docker Hub: `bencdr/code-server-deploy-container`
+## Acknowledgements
 
-To run the container locally, you can use:
-
-```console
-docker run -p 127.0.0.1:8080:8080 \
-  -v "$PWD/project:/home/coder/project" \
-  -u "$(id -u):$(id -g)" \
-  -e "DOCKER_USER=$USER" \
-  -e "PASSWORD=12345" \
-  -it bencdr/code-server-deploy-container:latest
-```
-
-## Modifying your code-server environment
-
-To update your code-server version, modify the version number on line 2 in your Dockerfile. See the [list of tags](https://hub.docker.com/r/codercom/code-server/tags?page=1&ordering=last_updated) for the latest version.
-
-We've included some examples on how to add additional dependencies in the root-level [Dockerfile](../Dockerfile):
-
-```Dockerfile
-# Install a VS Code extension:
-# Note: we use a different marketplace than VS Code. See https://github.com/cdr/code-server/blob/main/docs/FAQ.md#differences-compared-to-vs-code
-RUN code-server --install-extension esbenp.prettier-vscode
-
-# Install apt packages:
-RUN sudo apt-get install -y ubuntu-make
-
-# Copy files:
-COPY deploy-container/myTool /home/coder/myTool
-```
-
----
-
-## Environment variables
-
-| Variable Name      | Description                                                                                        | Default Value       |
-| ------------------ | -------------------------------------------------------------------------------------------------- | ------------------- |
-| `PASSWORD`         | Password for code-server                                                                           |                     |
-| `HASHED_PASSWORD`  | Overrrides PASSWORD. [SHA-256 hash](https://xorbin.com/tools/sha256-hash-calculator) of password   |
-| `USE_LINK`         | Use code-server --link instead of a password (coming soon)                                         | false               |
-| `GIT_REPO`         | A git repository to clone                                                                          |                     |
-| `DOTFILES_REPO`    | A [dotfiles](https://dotfiles.github.io/) repo to save preferences. Runs install.sh, if it exists. |                     |
-| `DOTFILES_SYMLINK` | Symlinks dotfiles repo to $HOME, if exits.                                                         | true                |
-| `START_DIR`        | The directory code-server opens (and clones repos in)                                              | /home/coder/project |
-
----
-
-Other code-server environment variables (such as `CODE_SERVER_CONFIG` ) can also be used. See the [code-server FAQ](https://github.com/cdr/code-server/blob/main/docs/FAQ.md) for details.
-
-## 💾 Persist your filesystem with `rclone`
-
-This image has built-in support for [rclone](https://rclone.org/) so that your files don't get lost when code-server is re-deployed.
-
-You can generate the rclone config on any machine, but it works great on the code-server environment itself, or Google Cloud Shell :)
-
-```sh
-# 1. install rclone
-# see https://rclone.org/install/ for other install options
-$ curl https://rclone.org/install.sh | sudo bash
-
-# 2. create a new rclone remote with your favorite storage provider ☁️
-$ rclone config
-
-# 3. Encode your rclone config and copy to your clipboard
-$ cat $(rclone config file | sed -n 2p) | base64 --wrap=0 # Linux
-$ cat $(rclone config file | sed -n 2p) | base64 --b 0 # MacOS
-```
-
-Now, you can add the following the environment variables in the code-server cloud app:
-
-| Environment Variable | Description                                                                                                                                           | Default Value                                | Required |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | -------- |
-| RCLONE_DATA          | the encoded rclone config you copied in step 3                                                                                                        | n/a                                          | ✅       |
-| RCLONE_REMOTE_NAME   | the name of the remote you added in step 2.<br />check with `$ rclone listremotes`                                                                    | code-server-remote                           |          |
-| RCLONE_SOURCE        | source directory to sync files in the code-server container                                                                                           | the project directory: `/home/coder/project` |          |
-| RCLONE_DESTINATION   | the path in the remote that rclone syncs to. change this if you have multiple code-server environments, or if you want to better organize your files. | code-server-files                            |          |
-| RCLONE_VSCODE_TASKS  | import push and pull shortcuts into VS Code ![rclone screenshot from VS Code](../img/rclone-vscode-tasks.png)                                         | true                                         |
-| RCLONE_AUTO_PUSH     | automatically push files on startup if the rclone remote is empty (environment -> rclone remote)                                                      | true                                         |          |
-| RCLONE_AUTO_PULL     | automatically pull files on startup if the rclone remote is not empty (rclone -> environment remote)                                                  | true                                         |          |
-| RCLONE_FLAGS         | additional flags to attach to the push and pull script.<br />type `$ rclone help flags` for a list.                                                   |                                              |          |
-
-```sh
-
-# --- How to use ---
-
-# Terminal:
-$ sh /home/coder/push_remote.sh # save your uncomitted files to the remote
-$ sh /home/coder/pull_remote.sh # get latest files from the remote
-
-# In VS Code:
-# use items in bottom bar or ctrl + P, run task: push_remote or pull_remote or
-```
-
-### Popular rclone flags
-
-To avoid syncing unnecessary directories, add this to `RCLONE_FLAGS` :
-
-```none
---exclude "node_modules/**" --exclude ".git/**"
-```
-
----
-
-## Todo
-
-- [ ] Make `push_remote` and `pull_remote` commands in path
-- [ ] Impliment file watcher or auto file sync in VS Code
-- [ ] Attach a "push" on a git stash??
-- [ ] Add support for SSH / VS Code remote access
-- [ ] Make rclone logs visible in environment for debugging
+[coder/deploy-code-server](https://github.com/coder/deploy-code-server) - creating the code-server product and the initial railway build logic.
