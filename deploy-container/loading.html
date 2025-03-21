@@ -102,6 +102,10 @@
       let reconnectAttempts = 0
       const maxReconnectAttempts = 5
       const reconnectInterval = 3000 // 3 seconds
+      let redirectTimeout = null
+      let connectionLostTimeout = null
+      let codeServerStarting = false
+      let redirectScheduled = false
 
       // Update connection status display
       function updateConnectionStatus(connected) {
@@ -109,10 +113,51 @@
         if (connected) {
           statusElement.className = "connection-status connected"
           statusElement.textContent = "Connected"
+
+          // Clear connection lost timeout if it exists
+          if (connectionLostTimeout) {
+            clearTimeout(connectionLostTimeout)
+            connectionLostTimeout = null
+          }
         } else {
           statusElement.className = "connection-status disconnected"
           statusElement.textContent = "Disconnected"
+
+          // If we lose connection after seeing "Starting code-server..." message,
+          // it likely means the server was terminated because code-server is starting
+          if (codeServerStarting && !redirectScheduled) {
+            console.log(
+              "Connection lost after code-server starting message, will redirect soon"
+            )
+            connectionLostTimeout = setTimeout(function () {
+              document.getElementById("log").innerText +=
+                "\n\nRedirecting to code-server..."
+              scheduleRedirect()
+            }, 2000)
+          }
         }
+      }
+
+      // Schedule redirect to code-server
+      function scheduleRedirect() {
+        if (redirectScheduled) return
+
+        redirectScheduled = true
+        const statusEl = document.querySelector(".status")
+        statusEl.innerHTML = "Code server is ready! <br>Redirecting you now..."
+        statusEl.style.color = "#4caf50"
+
+        // If we have an existing redirect timeout, clear it
+        if (redirectTimeout) {
+          clearTimeout(redirectTimeout)
+        }
+
+        // Schedule the redirect
+        redirectTimeout = setTimeout(function () {
+          window.location.href = "/"
+        }, 3000)
+
+        console.log("Redirect scheduled in 3 seconds")
       }
 
       // Connect to WebSocket server
@@ -141,31 +186,15 @@
 
               // Check if message contains the start of code-server
               if (message.content.includes("Starting code-server")) {
+                codeServerStarting = true
                 const statusEl = document.querySelector(".status")
                 statusEl.innerHTML =
                   "Code server is starting! <br>You will be redirected in a few seconds..."
                 statusEl.style.color = "#4caf50" // Green color to indicate progress
+
+                // Schedule redirect after a delay
+                setTimeout(scheduleRedirect, 5000)
               }
-            } else if (message.type === "redirect") {
-              console.log("Received redirect command to:", message.content)
-              // Show a message before redirecting
-              document.getElementById("log").innerText +=
-                "\n\nCode-server is ready! Redirecting..."
-
-              const statusEl = document.querySelector(".status")
-              statusEl.innerHTML =
-                "Code server is ready! <br>Redirecting you now..."
-              statusEl.style.color = "#4caf50"
-
-              // Disable auto-refresh while we're redirecting
-              if (window.refreshInterval) {
-                clearInterval(window.refreshInterval)
-              }
-
-              // Wait a brief moment to show the message, then redirect
-              setTimeout(function () {
-                window.location.href = message.content
-              }, 1000)
             }
           } catch (error) {
             console.error("Error parsing WebSocket message:", error)
@@ -176,8 +205,16 @@
           console.log("WebSocket connection closed")
           updateConnectionStatus(false)
 
-          // Attempt to reconnect if not at max attempts
-          if (reconnectAttempts < maxReconnectAttempts) {
+          // If code server was starting, this close might indicate it's ready
+          if (codeServerStarting && !redirectScheduled) {
+            console.log(
+              "Connection closed after code-server starting, scheduling redirect"
+            )
+            setTimeout(function () {
+              scheduleRedirect()
+            }, 3000)
+          } else if (reconnectAttempts < maxReconnectAttempts) {
+            // Otherwise try to reconnect
             reconnectAttempts++
             console.log(
               `Reconnecting (attempt ${reconnectAttempts}/${maxReconnectAttempts})...`
@@ -218,6 +255,8 @@
         // Set up fallback - check if code-server is ready every 10 seconds
         // in case WebSocket doesn't detect it
         setInterval(function () {
+          if (redirectScheduled) return // Don't check if redirect is already scheduled
+
           fetch("/", {
             method: "HEAD",
             cache: "no-store",
@@ -229,14 +268,20 @@
               if (contentType && contentType.includes("text/html")) {
                 // Check if we're still on the loading page
                 if (document.title === "Code Server Loading") {
-                  fetch("/loading-status.txt", { cache: "no-store" }).catch(
-                    () => {
+                  fetch("/loading-status.txt", { cache: "no-store" })
+                    .then((response) => {
+                      // If we can still reach the status file, code-server isn't ready
+                      console.log(
+                        "Status file still available, code-server not ready yet"
+                      )
+                    })
+                    .catch(() => {
+                      // If status file is gone but we can still access "/", code-server is likely ready
                       console.log(
                         "Status file not found, code-server might be ready"
                       )
-                      window.location.href = "/"
-                    }
-                  )
+                      scheduleRedirect()
+                    })
                 }
               }
             })

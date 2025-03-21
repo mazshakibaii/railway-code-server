@@ -163,48 +163,12 @@ func isCodeServerRunning() bool {
 // Monitor status file for changes and check if code-server is running
 func monitorStatus() {
 	var lastContent string
-	var lastCodeServerCheck time.Time
-	var codeServerStarting bool
-	var codeServerStartTime time.Time
 	
 	for {
-		currentContent, err := readStatusFile()
+		currentContent, _ := readStatusFile() // Ignore error
 		
-		// Check for code-server running every 5 seconds
-		if time.Since(lastCodeServerCheck) > 5*time.Second {
-			lastCodeServerCheck = time.Now()
-			
-			if isCodeServerRunning() {
-				// Notify clients that code-server is ready
-				message := WebsocketMessage{
-					Type:    "redirect",
-					Content: "/",
-				}
-				data, _ := json.Marshal(message)
-				manager.broadcast <- data
-			}
-		}
-		
-		// Check if the status includes "Starting code-server..." message
-		if !codeServerStarting && strings.Contains(currentContent, "Starting code-server") {
-			codeServerStarting = true
-			codeServerStartTime = time.Now()
-			log.Println("Detected code-server is starting, will redirect soon...")
-		}
-		
-		// If code-server is starting and it's been more than 5 seconds, trigger redirect
-		if codeServerStarting && time.Since(codeServerStartTime) > 5*time.Second {
-			log.Println("5 seconds passed since code-server start message, redirecting...")
-			message := WebsocketMessage{
-				Type:    "redirect",
-				Content: "/",
-			}
-			data, _ := json.Marshal(message)
-			manager.broadcast <- data
-			codeServerStarting = false // Reset in case we don't redirect for some reason
-		}
-		
-		if err == nil && currentContent != lastContent {
+		// Only send updates when content changes
+		if currentContent != lastContent {
 			lastContent = currentContent
 			
 			// Broadcast status update to all clients
@@ -214,6 +178,11 @@ func monitorStatus() {
 			}
 			data, _ := json.Marshal(message)
 			manager.broadcast <- data
+			
+			// Log important status changes
+			if strings.Contains(currentContent, "Starting code-server") {
+				log.Println("Detected code-server is starting")
+			}
 		}
 		
 		time.Sleep(*checkInterval)
