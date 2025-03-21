@@ -22,7 +22,6 @@ COPY deploy-container/server/bin/status-server /home/coder/loading/status-server
 
 # Set up the entrypoint file
 COPY deploy-container/entrypoint.sh /home/coder/entrypoint.sh
-COPY deploy-container/rclone-tasks.json /tmp/rclone-tasks.json
 COPY deploy-container/settings.json /home/coder/.local/share/code-server/User/settings.json
 
 # Fix permissions
