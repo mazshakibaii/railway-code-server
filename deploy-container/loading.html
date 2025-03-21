@@ -61,6 +61,21 @@
         border-radius: 4px;
         cursor: pointer;
       }
+      .connection-status {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        background-color: rgba(30, 30, 30, 0.8);
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+      .connected {
+        color: #4caf50;
+      }
+      .disconnected {
+        color: #f44336;
+      }
     </style>
   </head>
   <body>
@@ -70,10 +85,11 @@
       Please wait while your environment is being prepared. This may take a few
       minutes.
     </div>
-    <div class="log" id="log">Loading status...</div>
-    <button class="refresh" onclick="window.location.reload()">
-      Refresh Status
-    </button>
+    <div class="log" id="log">Connecting to status server...</div>
+    <button class="refresh" onclick="reconnectWebsocket()">Reconnect</button>
+    <div id="connection-status" class="connection-status disconnected">
+      Disconnected
+    </div>
     <script>
       // Function to scroll log to bottom
       function scrollToBottom() {
@@ -81,83 +97,136 @@
         logElement.scrollTop = logElement.scrollHeight
       }
 
-      // Function to check if code-server is ready by looking for its login page or UI
-      function checkCodeServerReady() {
-        fetch("/", {
-          method: "HEAD",
-          cache: "no-store",
-        })
-          .then((response) => {
-            // Check if response might be from code-server rather than loading server
-            // The loading server only serves specific paths, so any success on "/"
-            // means code-server is likely running
-            if (response.ok && response.status === 200) {
-              console.log("Code server may be ready, checking content type...")
-              return response.headers.get("content-type")
-            }
-            return null
-          })
-          .then((contentType) => {
-            if (contentType && contentType.includes("text/html")) {
-              // Find out if it's from our loading page or from code-server
-              return fetch("/loading-status.txt", { cache: "no-store" })
-                .then((statusResponse) => {
-                  if (statusResponse.status === 404) {
-                    // If loading-status.txt is not found, code-server is running
-                    console.log("Code-server is ready, redirecting...")
-                    window.location.href = "/"
-                    return true
-                  }
-                  return false
-                })
-                .catch(() => {
-                  // If we can't fetch loading-status.txt, code-server might be running
-                  console.log(
-                    "Cannot fetch status, code-server might be ready, redirecting..."
-                  )
-                  window.location.href = "/"
-                  return true
-                })
-            }
-            return false
-          })
-          .catch((error) => {
-            console.log("Error checking code-server status:", error)
-            return false
-          })
+      // WebSocket connection
+      let socket = null
+      let reconnectAttempts = 0
+      const maxReconnectAttempts = 5
+      const reconnectInterval = 3000 // 3 seconds
+
+      // Update connection status display
+      function updateConnectionStatus(connected) {
+        const statusElement = document.getElementById("connection-status")
+        if (connected) {
+          statusElement.className = "connection-status connected"
+          statusElement.textContent = "Connected"
+        } else {
+          statusElement.className = "connection-status disconnected"
+          statusElement.textContent = "Disconnected"
+        }
       }
 
-      // Check for code-server every 3 seconds
-      const readyCheckInterval = setInterval(checkCodeServerReady, 3000)
+      // Connect to WebSocket server
+      function connectWebsocket() {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+        const host = window.location.host
+        const wsUrl = `${protocol}//${host}/ws`
 
-      // Auto-refresh the loading page every 10 seconds if code-server isn't ready yet
-      const refreshTimeout = setTimeout(function () {
-        window.location.reload()
-      }, 10000)
+        socket = new WebSocket(wsUrl)
 
-      // Fetch the latest logs
-      fetch("/loading-status.txt")
-        .then((response) => response.text())
-        .then((data) => {
-          document.getElementById("log").innerText = data
-          // Scroll to bottom after updating content
-          scrollToBottom()
-
-          // If logs contain a message about starting code-server, check more frequently
-          if (data.includes("Starting code-server")) {
-            console.log("Code-server is starting, checking more frequently...")
-            // Clear existing interval and check more frequently
-            clearInterval(readyCheckInterval)
-            setInterval(checkCodeServerReady, 1000)
-          }
-        })
-        .catch((err) => {
+        socket.onopen = function () {
+          console.log("WebSocket connection established")
+          updateConnectionStatus(true)
+          reconnectAttempts = 0
           document.getElementById("log").innerText =
-            "Error loading status. Please try refreshing."
-        })
+            "Connected to status server, waiting for updates..."
+        }
 
-      // Also scroll to bottom on initial load
-      window.onload = scrollToBottom
+        socket.onmessage = function (event) {
+          try {
+            const message = JSON.parse(event.data)
+
+            if (message.type === "status") {
+              document.getElementById("log").innerText = message.content
+              scrollToBottom()
+            } else if (message.type === "redirect") {
+              console.log("Received redirect command to:", message.content)
+              // Show a message before redirecting
+              document.getElementById("log").innerText +=
+                "\n\nCode-server is ready! Redirecting..."
+
+              // Wait a brief moment to show the message, then redirect
+              setTimeout(function () {
+                window.location.href = message.content
+              }, 1000)
+            }
+          } catch (error) {
+            console.error("Error parsing WebSocket message:", error)
+          }
+        }
+
+        socket.onclose = function () {
+          console.log("WebSocket connection closed")
+          updateConnectionStatus(false)
+
+          // Attempt to reconnect if not at max attempts
+          if (reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++
+            console.log(
+              `Reconnecting (attempt ${reconnectAttempts}/${maxReconnectAttempts})...`
+            )
+            document.getElementById(
+              "log"
+            ).innerText += `\nConnection lost. Reconnecting (attempt ${reconnectAttempts}/${maxReconnectAttempts})...`
+            setTimeout(connectWebsocket, reconnectInterval)
+          } else {
+            document.getElementById("log").innerText +=
+              "\nFailed to connect after multiple attempts.\nPlease try refreshing the page."
+          }
+        }
+
+        socket.onerror = function (error) {
+          console.error("WebSocket error:", error)
+          document.getElementById("log").innerText +=
+            "\nError connecting to status server."
+        }
+      }
+
+      // Function to manually reconnect
+      function reconnectWebsocket() {
+        if (socket) {
+          socket.close()
+        }
+        reconnectAttempts = 0
+        document.getElementById("log").innerText =
+          "Reconnecting to status server..."
+        connectWebsocket()
+      }
+
+      // Initialize the WebSocket connection when page loads
+      window.onload = function () {
+        connectWebsocket()
+        scrollToBottom()
+
+        // Set up fallback - check if code-server is ready every 10 seconds
+        // in case WebSocket doesn't detect it
+        setInterval(function () {
+          fetch("/", {
+            method: "HEAD",
+            cache: "no-store",
+          })
+            .then((response) => {
+              return response.headers.get("content-type")
+            })
+            .then((contentType) => {
+              if (contentType && contentType.includes("text/html")) {
+                // Check if we're still on the loading page
+                if (document.title === "Code Server Loading") {
+                  fetch("/loading-status.txt", { cache: "no-store" }).catch(
+                    () => {
+                      console.log(
+                        "Status file not found, code-server might be ready"
+                      )
+                      window.location.href = "/"
+                    }
+                  )
+                }
+              }
+            })
+            .catch((error) => {
+              console.log("Error checking code-server status:", error)
+            })
+        }, 10000)
+      }
     </script>
   </body>
 </html>

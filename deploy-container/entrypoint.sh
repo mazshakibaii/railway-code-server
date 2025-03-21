@@ -19,10 +19,10 @@ update_status() {
 # Initialize the status file
 echo "Initializing environment..." > "$STATUS_FILE"
 
-# Start the loading page server
+# Start the status server
 update_status "Starting initialization server..."
 cd $LOADING_DIR  # Change to loading directory so relative paths work correctly
-python3 $LOADING_DIR/server.py &
+./status-server &
 LOADING_PID=$!
 
 # Trap to ensure we kill the loading server if the script exits unexpectedly
@@ -35,8 +35,13 @@ project_init() {
         echo "Example file. Have questions? Join us at https://community.coder.com" > $START_DIR/coder.txt
     else
         update_status "Cloning repository: $GIT_REPO"
-        git clone $GIT_REPO $START_DIR
-        update_status "Repository cloned successfully"
+        # Check if directory exists and is not empty
+        if [ -d "$START_DIR" ] && [ "$(ls -A $START_DIR)" ]; then
+            update_status "Project directory already exists and is not empty. Skipping git clone."
+        else
+            git clone $GIT_REPO $START_DIR
+            update_status "Repository cloned successfully"
+        fi
     fi
 }
 
@@ -221,8 +226,17 @@ update_status "Environment initialization completed. Starting code-server..."
 # Sleep a moment to make sure the message is visible
 sleep 2
 
-# Kill the loading server
-kill $LOADING_PID
+# Make sure to properly kill the loading server and release port 8080
+update_status "Stopping initialization server..."
+if [ -n "$LOADING_PID" ]; then
+    kill $LOADING_PID
+    # Wait for the process to actually terminate
+    wait $LOADING_PID 2>/dev/null || true
+    # Make extra sure the port is released
+    sleep 1
+fi
+
+# Reset the trap
 trap - EXIT
 
 # Start code-server

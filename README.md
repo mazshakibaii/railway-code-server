@@ -1,6 +1,59 @@
-# code-server-deploy-container
+# Railway Code Server
 
-An container image built for deploying code-server.
+A customized version of code-server designed for Railway deployments with a WebSocket-based loading page.
+
+## Features
+
+- Fast startup with a loading page during initialization
+- Real-time status updates using WebSockets
+- Automatic redirection to code-server when ready
+- Support for custom Git repositories
+- Support for dotfiles
+
+## Building the Status Server Binary
+
+Before building the Docker image, you need to compile the Go status server binary:
+
+```bash
+# Navigate to the server directory
+cd deploy-container/server
+
+# Initialize the Go module (if not already done)
+go mod init status-server
+go get github.com/gorilla/websocket
+go mod tidy
+
+# Build the binary
+go build -o bin/status-server main.go
+```
+
+This will create a binary in `deploy-container/server/bin/` that will be copied into the Docker image.
+
+## Building the Docker Image
+
+```bash
+docker build -t code-server-railway .
+```
+
+## Running the Container
+
+```bash
+docker run -p 8080:8080 -e PASSWORD=your_password code-server-railway
+```
+
+## Environment Variables
+
+- `PASSWORD`: The password for the code-server instance
+- `GIT_REPO`: The Git repository to clone on startup
+- `DOTFILES_REPO`: A repository of dotfiles to apply
+- `INSTALL_APPS`: Comma-separated list of applications to install (e.g., "node,python,go,rust")
+- `VS_CODE_EXTENSIONS`: Comma-separated list of VS Code extensions to install
+
+## Railway Deployment
+
+This repository is designed to be deployed on Railway. Simply connect your repository to Railway and it will automatically build and deploy your code-server instance.
+
+**Important**: Make sure to precompile the Go status server binary before pushing changes. The binary is shipped with the repository to speed up the deployment process.
 
 ## Guides
 
