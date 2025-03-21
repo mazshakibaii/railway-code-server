@@ -5,6 +5,7 @@ PREFIX="deploy-code-server"
 APP_NAME="${APP_NAME:-Code Server}"
 LOADING_DIR="/home/coder/loading"
 STATUS_FILE="$LOADING_DIR/loading-status.txt"
+ENTRYPOINT_PATH=$(realpath "$0")  # Get absolute path of this script
 
 # Create our project directory if it doesn't exist
 mkdir -p $START_DIR
@@ -119,6 +120,9 @@ install_applications() {
     update_status "Application installation completed"
 }
 
+# Initialize the project (clone repository or create sample file)
+project_init
+
 # Add dotfiles, if set
 if [ -n "$DOTFILES_REPO" ]; then
     update_status "Cloning dotfiles from $DOTFILES_REPO"
@@ -179,6 +183,23 @@ fi
 
 # Reset the trap
 trap - EXIT
+
+# Create a cleanup script that will delete the loading directory and this script
+CLEANUP_SCRIPT=$(mktemp)
+cat > $CLEANUP_SCRIPT << EOF
+#!/bin/bash
+# Wait a moment to ensure the code-server has started
+sleep 5
+# Clean up the loading directory and this entrypoint script
+rm -rf $LOADING_DIR
+rm -f $ENTRYPOINT_PATH
+# Clean up this cleanup script itself
+rm -f \$0
+EOF
+
+# Make the cleanup script executable and run it in the background
+chmod +x $CLEANUP_SCRIPT
+nohup $CLEANUP_SCRIPT > /dev/null 2>&1 &
 
 # Start code-server
 echo "[$PREFIX] Starting code-server..."

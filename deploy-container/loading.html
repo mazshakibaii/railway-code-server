@@ -60,6 +60,7 @@
         color: white;
         border-radius: 4px;
         cursor: pointer;
+        display: none; /* Hide by default */
       }
       .connection-status {
         position: fixed;
@@ -76,6 +77,12 @@
       .disconnected {
         color: #f44336;
       }
+      .hidden {
+        display: none;
+      }
+      .visible {
+        display: block;
+      }
     </style>
   </head>
   <body>
@@ -86,7 +93,13 @@
       minutes.
     </div>
     <div class="log" id="log">Connecting to status server...</div>
-    <button class="refresh" onclick="reconnectWebsocket()">Reconnect</button>
+    <button
+      id="reconnect-button"
+      class="refresh hidden"
+      onclick="reconnectWebsocket()"
+    >
+      Reconnect
+    </button>
     <div id="connection-status" class="connection-status disconnected">
       Disconnected
     </div>
@@ -110,9 +123,13 @@
       // Update connection status display
       function updateConnectionStatus(connected) {
         const statusElement = document.getElementById("connection-status")
+        const reconnectButton = document.getElementById("reconnect-button")
+
         if (connected) {
           statusElement.className = "connection-status connected"
           statusElement.textContent = "Connected"
+          reconnectButton.classList.remove("visible")
+          reconnectButton.classList.add("hidden")
 
           // Clear connection lost timeout if it exists
           if (connectionLostTimeout) {
@@ -122,6 +139,8 @@
         } else {
           statusElement.className = "connection-status disconnected"
           statusElement.textContent = "Disconnected"
+          reconnectButton.classList.remove("hidden")
+          reconnectButton.classList.add("visible")
 
           // If we lose connection after seeing "Starting code-server..." message,
           // it likely means the server was terminated because code-server is starting
@@ -146,6 +165,9 @@
         const statusEl = document.querySelector(".status")
         statusEl.innerHTML = "Code server is ready! <br>Redirecting you now..."
         statusEl.style.color = "#4caf50"
+
+        // Hide the reconnect button when redirecting
+        document.getElementById("reconnect-button").classList.add("hidden")
 
         // If we have an existing redirect timeout, clear it
         if (redirectTimeout) {
