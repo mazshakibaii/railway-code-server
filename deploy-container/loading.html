@@ -138,11 +138,29 @@
             if (message.type === "status") {
               document.getElementById("log").innerText = message.content
               scrollToBottom()
+
+              // Check if message contains the start of code-server
+              if (message.content.includes("Starting code-server")) {
+                const statusEl = document.querySelector(".status")
+                statusEl.innerHTML =
+                  "Code server is starting! <br>You will be redirected in a few seconds..."
+                statusEl.style.color = "#4caf50" // Green color to indicate progress
+              }
             } else if (message.type === "redirect") {
               console.log("Received redirect command to:", message.content)
               // Show a message before redirecting
               document.getElementById("log").innerText +=
                 "\n\nCode-server is ready! Redirecting..."
+
+              const statusEl = document.querySelector(".status")
+              statusEl.innerHTML =
+                "Code server is ready! <br>Redirecting you now..."
+              statusEl.style.color = "#4caf50"
+
+              // Disable auto-refresh while we're redirecting
+              if (window.refreshInterval) {
+                clearInterval(window.refreshInterval)
+              }
 
               // Wait a brief moment to show the message, then redirect
               setTimeout(function () {

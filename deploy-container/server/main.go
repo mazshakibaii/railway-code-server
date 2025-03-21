@@ -164,6 +164,8 @@ func isCodeServerRunning() bool {
 func monitorStatus() {
 	var lastContent string
 	var lastCodeServerCheck time.Time
+	var codeServerStarting bool
+	var codeServerStartTime time.Time
 	
 	for {
 		currentContent, err := readStatusFile()
@@ -181,6 +183,25 @@ func monitorStatus() {
 				data, _ := json.Marshal(message)
 				manager.broadcast <- data
 			}
+		}
+		
+		// Check if the status includes "Starting code-server..." message
+		if !codeServerStarting && strings.Contains(currentContent, "Starting code-server") {
+			codeServerStarting = true
+			codeServerStartTime = time.Now()
+			log.Println("Detected code-server is starting, will redirect soon...")
+		}
+		
+		// If code-server is starting and it's been more than 5 seconds, trigger redirect
+		if codeServerStarting && time.Since(codeServerStartTime) > 5*time.Second {
+			log.Println("5 seconds passed since code-server start message, redirecting...")
+			message := WebsocketMessage{
+				Type:    "redirect",
+				Content: "/",
+			}
+			data, _ := json.Marshal(message)
+			manager.broadcast <- data
+			codeServerStarting = false // Reset in case we don't redirect for some reason
 		}
 		
 		if err == nil && currentContent != lastContent {
