@@ -11,9 +11,6 @@ RUN apt-get update && apt-get install -y \
     sudo \
     && rm -rf /var/lib/apt/lists/*
 
-# Install rclone for file synchronization
-RUN curl https://rclone.org/install.sh | bash
-
 # Set up directories
 RUN mkdir -p /home/coder/loading \
     && mkdir -p /home/coder/.local/share/code-server/User
