@@ -162,9 +162,6 @@
         if (redirectScheduled) return
 
         redirectScheduled = true
-        const statusEl = document.querySelector(".status")
-        statusEl.innerHTML = "Code server is ready! <br>Redirecting you now..."
-        statusEl.style.color = "#4caf50"
 
         // Hide the reconnect button when redirecting
         document.getElementById("reconnect-button").classList.add("hidden")
