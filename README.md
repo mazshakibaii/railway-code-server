@@ -10,36 +10,66 @@ A customized version of code-server designed for Railway deployments with a WebS
 - Support for custom Git repositories
 - Support for dotfiles
 
-## Building the Status Server Binary
+## Building and Running
 
-Before building the Docker image, you need to compile the Go status server binary:
-
-```bash
-# Navigate to the server directory
-cd deploy-container/server
-
-# Initialize the Go module (if not already done)
-go mod init status-server
-go get github.com/gorilla/websocket
-go mod tidy
-
-# Build the binary
-go build -o bin/status-server main.go
-```
-
-This will create a binary in `deploy-container/server/bin/` that will be copied into the Docker image.
-
-## Building the Docker Image
+This project uses a Makefile for all build steps. Here's how to use it:
 
 ```bash
-docker build -t code-server-railway .
+# See all available targets
+make help
+
+# Build the status server for Linux (required for Docker)
+make linux
+
+# Build Docker image (includes building the Linux binary)
+make docker
+
+# Run the Docker container
+make run
 ```
 
-## Running the Container
+### Available Make Targets
 
-```bash
-docker run -p 8080:8080 -e PASSWORD=your_password code-server-railway
-```
+- `make deps` - Install Go dependencies
+- `make build` - Build for current platform
+- `make build-linux` - Build for Linux (cross-compilation)
+- `make linux` - Complete Linux build (deps + build-linux)
+- `make clean` - Clean build artifacts
+- `make docker` - Build Docker image (includes linux build)
+- `make run` - Run Docker container
+
+## Building Step-by-Step
+
+If you prefer to understand the build process in more detail:
+
+1. **First, build the Go status server binary**:
+
+   ```bash
+   make linux
+   ```
+
+   This compiles the status server to `deploy-container/server/bin/status-server`
+
+2. **Then, build the Docker image**:
+
+   ```bash
+   make docker
+   ```
+
+   Or manually with:
+
+   ```bash
+   docker build -t code-server-railway .
+   ```
+
+3. **Finally, run the container**:
+   ```bash
+   make run
+   ```
+   Or manually with:
+   ```bash
+   docker run -p 8080:8080 -e PASSWORD=your_password code-server-railway
+   ```
 
 ## Environment Variables
 
